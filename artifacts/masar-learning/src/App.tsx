@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Logo } from '@/components/Logo';
+import { estimateReadingMinutes, LessonMarkdown } from '@/components/LessonMarkdown';
 import { Route, Switch, Link, useLocation, Router as WouterRouter } from 'wouter';
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, ChevronLeft, CircleHelp, Compass, Layers3, Moon, Sun, Target, TrendingUp } from 'lucide-react';
 import curriculumData from '@/data/curriculum.json';
@@ -33,6 +34,7 @@ const chapters = (curriculumData as { chapters: Chapter[] }).chapters;
 const questions = (assessmentData as { questions: Question[] }).questions;
 const orderedChapters = [...chapters].sort((a, b) => a.order - b.order);
 const storageKeys = { result: 'masar-result', answers: 'masar-assessment-responses', attempts: 'masar-assessment-attempts', done: 'masar-completed-lessons', theme: 'masar-theme' };
+const lessonFontSizeKey = 'masar-lesson-font-size';
 const queryClient = new QueryClient();
 
 function readStorage<T>(key: string, fallback: T): T {
@@ -43,6 +45,12 @@ function readStorage<T>(key: string, fallback: T): T {
 }
 function writeStorage(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Storage may be unavailable; app remains usable in memory. */ }
+}
+function readLessonFontSize() {
+  try {
+    const saved = Number(localStorage.getItem(lessonFontSizeKey));
+    return Number.isInteger(saved) && saved >= 16 && saved <= 22 ? saved : 18;
+  } catch { return 18; }
 }
 function readAttempts(): AssessmentAttempt[] {
   const stored = readStorage<unknown>(storageKeys.attempts, []);
@@ -62,7 +70,6 @@ const pathInfo = {
   guided: { title: 'المسار الموجّه', subtitle: 'خريطة مرنة مع مساحة للاختيار.', color: 'text-teal-600', bg: 'bg-teal-500/10', accent: '#14B8A6', description: 'نقترح لك بداية مناسبة، ويمكنك استكشاف الدروس الأخرى متى أردت.' },
   open: { title: 'المسار المفتوح', subtitle: 'فضولك هو نقطة البداية.', color: 'text-orange-600', bg: 'bg-orange-500/10', accent: '#F97316', description: 'المحتوى كله متاح لك. ابدأ من السؤال الذي يشغلك واتبع اهتمامك.' },
 };
-const learningPaths: LearningPath[] = ['structured', 'guided', 'open'];
 const labels = ['لا أوافق بشدة', 'لا أوافق', 'محايد', 'أوافق', 'أوافق بشدة'];
 
 function App() {
@@ -112,7 +119,6 @@ function AppShell({ children }: { children: ReactNode }) {
     <footer className="mt-20 border-t border-border/80 py-7">
       <div className="page-wrap flex flex-col items-center justify-between gap-2 text-sm text-muted-foreground sm:flex-row">
         <span className="flex items-center gap-3"><Logo size={36} className="shrink-0" /><span className="max-w-3xl text-center text-sm font-bold leading-6 text-foreground">{SITE_NAME}</span></span>
-        <span>بيئة تجريبية تحفظ تقدّمك على هذا الجهاز فقط.</span>
       </div>
     </footer>
   </div>;
@@ -124,59 +130,22 @@ function NavItem({ href, label, active, testId }: { href: string; label: string;
 
 function HomePage() {
   const result = readStorage<Result | null>(storageKeys.result, null);
-  const [done, setDone] = useState<string[]>(() => readStorage<string[]>(storageKeys.done, []));
-  const completedCount = done.length;
   return <div className="hero-grid overflow-hidden">
     <section className="page-wrap grid min-h-[570px] items-center gap-8 py-12 md:grid-cols-[1.04fr_.96fr] md:py-16">
       <div className="reveal order-2 max-w-[610px] md:order-1">
-        <div className="mb-6 max-w-[560px] rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm font-semibold leading-6 text-primary" data-testid="text-site-name">{SITE_NAME}</div>
-        <h1 className="text-[2.55rem] font-extrabold leading-[1.32] tracking-tight sm:text-6xl">التفكير التصميمي،<br /><span className="text-primary">وإنتاج المعرفة</span></h1>
-        <p className="mt-5 max-w-[520px] text-lg leading-8 text-muted-foreground">تقدّم البيئة محتوى المقرر ضمن ثلاثة مسارات تعلّم، وتتيح متابعة التقدم على هذا الجهاز.</p>
+        <h1 className="text-[2.55rem] font-extrabold leading-[1.32] tracking-tight sm:text-6xl">فكرة التصميم<br /><span className="text-primary">والإنتاج</span></h1>
+        <p className="mt-5 max-w-[560px] text-base leading-8 text-muted-foreground sm:text-lg" data-testid="text-site-name">{SITE_NAME}</p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href={result ? `/path/${result.path}` : '/assessment'} className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-primary px-6 py-3 font-bold text-primary-foreground shadow-[0_10px_22px_rgba(79,70,229,.18)] transition hover:-translate-y-0.5" data-testid="link-start-learning">{result ? 'متابعة المسار' : 'بدء التقييم'}<ArrowLeft size={18} /></Link>
-          <Link href="/chapters" className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card/80 px-5 py-3 font-semibold text-foreground transition hover:bg-muted" data-testid="link-browse-home">استعراض المقرر<ChevronLeft size={17} /></Link>
+          <Link href={result ? `/path/${result.path}` : '/assessment'} className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-primary px-6 py-3 font-bold text-primary-foreground shadow-[0_10px_22px_rgba(79,70,229,.18)] transition hover:-translate-y-0.5" data-testid="link-start-learning">{result ? 'متابعة التعلّم' : 'بدء التقييم'}<ArrowLeft size={18} /></Link>
         </div>
-        <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm text-muted-foreground"><span className="flex items-center gap-2"><CheckCircle2 size={17} className="text-secondary" />محتوى المقرر الجامعي</span><span className="flex items-center gap-2"><Target size={17} className="text-primary" />ثلاثة مسارات للتعلّم</span><span className="flex items-center gap-2"><BookOpen size={17} className="text-orange-500" />حفظ التقدم محليًا</span></div>
       </div>
-      <div className="reveal-delay relative order-1 mx-auto flex h-[300px] w-full max-w-[480px] items-end justify-center md:order-2 md:h-[460px]">
+      <div className="hero-visual reveal-delay relative order-1 mx-auto flex h-[300px] w-full max-w-[480px] items-end justify-center md:order-2 md:h-[460px]" data-testid="hero-visual">
         <div className="absolute inset-x-4 bottom-4 top-8 rounded-[45%_45%_22%_22%] bg-gradient-to-br from-[#d8e9e6] via-[#e3e4f6] to-[#fce4cd] dark:from-[#263c43] dark:via-[#333252] dark:to-[#45382f]" />
         <div className="absolute left-4 top-12 hidden h-20 w-20 rounded-3xl border border-white/50 bg-white/35 backdrop-blur md:block" />
-        <div className="absolute right-2 top-24 grid h-14 w-14 place-items-center rounded-2xl bg-card shadow-lg md:right-1 md:top-28"><BookOpen className="text-primary" size={24} /></div>
-        <img src={studentPortrait} alt="طالب جامعي يستعد لرحلته التعليمية" className="relative z-10 h-[295px] w-auto max-w-full object-contain object-bottom drop-shadow-[0_22px_24px_rgba(39,45,68,.18)] md:h-[455px]" data-testid="img-student-portrait" />
+        <div className="hero-float-icon absolute right-2 top-24 grid h-14 w-14 place-items-center rounded-2xl bg-card shadow-lg md:right-1 md:top-28"><BookOpen className="text-primary" size={24} /></div>
+        <img src={studentPortrait} alt="طالب جامعي يستعد لرحلته التعليمية" className="hero-portrait-interaction relative z-10 h-[295px] w-auto max-w-full object-contain object-bottom drop-shadow-[0_22px_24px_rgba(39,45,68,.18)] md:h-[455px]" data-testid="img-student-portrait" />
         <div className="absolute bottom-8 left-0 z-20 rounded-2xl border border-border/70 bg-card/95 px-4 py-3 shadow-lg backdrop-blur"><span className="block text-xs text-muted-foreground">تعلّم جامعي</span><span className="mt-1 block text-sm font-bold">من الفهم إلى التطبيق</span></div>
       </div>
-    </section>
-    <section className="page-wrap pb-12">
-      <div className="soft-card grid gap-5 rounded-[28px] p-5 sm:grid-cols-3 sm:gap-0 sm:p-7">
-        <Step number="01" title="أجب عن التقييم" description="تساعد الإجابات على تقدير مستوى تحمل الغموض." color="text-primary" />
-        <Step number="02" title="راجع المسار المقترح" description="اختر بين التدرج، والإرشاد، وحرية الاستكشاف." color="text-secondary" />
-        <Step number="03" title="تابع إنجاز الدروس" description="محتوى المقرر مع سجل تقدم محلي." color="text-orange-500" />
-      </div>
-      <section className="mt-8" aria-labelledby="learning-paths-heading">
-        <div className="mb-5 max-w-2xl"><p className="text-sm font-bold text-secondary">أنماط تنظيم التعلّم</p><h2 id="learning-paths-heading" className="mt-1 text-2xl font-extrabold">المسارات التعليمية</h2><p className="mt-2 text-sm leading-7 text-muted-foreground">تُعرض المسارات الثلاثة هنا، ويقترح التقييم نقطة بداية وفق الإجابات.</p></div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {learningPaths.map(path => {
-            const info = pathInfo[path];
-            const isCurrent = result?.path === path;
-            const href = !result ? '/assessment' : isCurrent ? `/path/${path}` : '/assessment?fresh=1';
-            const action = !result ? 'ابدأ التقييم' : isCurrent ? 'عرض تفاصيل المسار' : 'أعد التقييم لاستكشافه';
-            return <article key={path} className="soft-card flex flex-col rounded-[24px] p-5" data-testid={`card-path-${path}`} aria-current={isCurrent ? 'true' : undefined}>
-              <div className="flex items-center justify-between gap-3"><span className={`rounded-full px-3 py-1.5 text-xs font-bold ${info.bg} ${info.color}`}>{isCurrent ? 'المسار الحالي' : 'مسار تعلّم'}</span><PathAnimation path={path} className="h-11 w-20" /></div>
-              <h3 className={`mt-4 text-lg font-extrabold ${info.color}`}>{info.title}</h3>
-              <p className="mt-2 min-h-[72px] text-sm leading-6 text-muted-foreground">{info.description}</p>
-              <Link href={href} className="mt-auto inline-flex items-center gap-2 pt-4 text-sm font-bold text-primary hover:underline" data-testid={`link-card-path-${path}`}>{action}<ArrowLeft size={15} /></Link>
-            </article>;
-          })}
-        </div>
-      </section>
-      <div className="mt-7 flex flex-col justify-between gap-4 rounded-[26px] bg-[#252b49] p-6 text-white sm:flex-row sm:items-center sm:p-8">
-        <div><p className="text-sm text-white/65">{result ? 'مرحبًا بعودتك' : 'دون حساب، ودون ضغط'}</p><h2 className="mt-1 text-xl font-bold">{result ? `مسارك الحالي: ${pathInfo[result.path].title}` : 'تقدّمك يبقى على جهازك'}</h2><p className="mt-2 text-sm text-white/65">{result ? `أكملت ${completedCount} درس${completedCount === 1 ? 'ًا' : 'ًا'} حتى الآن.` : 'إجاباتك وإنجازك لا تغادر متصفحك.'}</p></div>
-        <Link href={result ? '/progress' : '/assessment'} className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#252b49] transition hover:-translate-y-0.5 sm:self-center" data-testid="link-journey-cta">{result ? 'عرض التقدّم' : 'ابدأ التقييم'}<ArrowLeft size={17} /></Link>
-      </div>
-    </section>
-    <section className="page-wrap pb-8">
-      <div className="mb-5 flex items-end justify-between gap-3"><div><p className="text-sm font-bold text-secondary">المقرر الدراسي</p><h2 className="mt-1 text-2xl font-extrabold">فصول المقرر</h2></div><Link href="/chapters" className="text-sm font-bold text-primary" data-testid="link-all-chapters">كل الفصول ←</Link></div>
-      <div className="grid gap-3 sm:grid-cols-2">{orderedChapters.slice(0, 4).map((chapter, i) => <ChapterTeaser key={chapter.id} chapter={chapter} index={i} />)}</div>
     </section>
   </div>;
 }
@@ -222,17 +191,6 @@ function PathAnimation({ path, className = '' }: { path: LearningPath; className
       />)}
     </>}
   </svg>;
-}
-
-function Step({ number, title, description, color }: { number: string; title: string; description: string; color: string }) {
-  return <div className="flex gap-4 sm:px-5 sm:first:ps-0 sm:last:pe-0 sm:not(:last-child):border-e sm:not(:last-child):border-border"><span className={`mt-1 font-mono text-sm font-bold ${color}`}>{number}</span><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p></div></div>;
-}
-function ChapterTeaser({ chapter, index }: { chapter: Chapter; index: number }) {
-  return <Link href={`/chapter/${chapter.order}`} className="soft-card group flex items-center gap-4 rounded-2xl p-4 transition hover:-translate-y-0.5 hover:border-primary/35" data-testid={`card-chapter-${chapter.order}`}>
-    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl font-bold ${['bg-primary/10 text-primary', 'bg-teal-500/10 text-teal-600', 'bg-blue-500/10 text-blue-600', 'bg-orange-500/10 text-orange-600'][index % 4]}`}>{String(chapter.order).padStart(2, '0')}</span>
-    <span className="min-w-0 flex-1"><span className="block truncate font-bold">{chapter.title}</span><span className="mt-1 block text-xs text-muted-foreground">{chapter.lessons.length} دروس · فصل {chapter.id} من المصدر</span></span>
-    <ChevronLeft size={18} className="text-muted-foreground transition group-hover:-translate-x-1 group-hover:text-primary" />
-  </Link>;
 }
 
 function AssessmentPage() {
@@ -392,6 +350,9 @@ function ChapterPage({ params }: { params: { n?: string } }) {
   const chapter = orderedChapters[chapterIndex];
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [done, setDone] = useState<string[]>(() => readStorage<string[]>(storageKeys.done, []));
+  const [fontSize, setFontSize] = useState(readLessonFontSize);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const readingContentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!result) { setLocation('/assessment'); return; }
     if (chapter) {
@@ -399,9 +360,38 @@ function ChapterPage({ params }: { params: { n?: string } }) {
       setSelectedLessonId(fromUrl && chapter.lessons.some(l => l.id === fromUrl) ? fromUrl : chapter.lessons[0]?.id ?? null);
     }
   }, [chapter?.id, location, Boolean(result), setLocation]);
+  const active = chapter?.lessons.find(l => l.id === selectedLessonId) ?? chapter?.lessons[0];
+  useEffect(() => {
+    try { localStorage.setItem(lessonFontSizeKey, String(fontSize)); } catch { /* Keep font controls usable when storage is unavailable. */ }
+  }, [fontSize]);
+  useEffect(() => {
+    const update = () => {
+      const content = readingContentRef.current;
+      if (!content) { setReadingProgress(0); return; }
+      const top = content.getBoundingClientRect().top + window.scrollY;
+      const height = Math.max(content.offsetHeight, 1);
+      const viewedThrough = window.scrollY + window.innerHeight - top;
+      setReadingProgress(Math.max(0, Math.min(100, Math.round(viewedThrough / height * 100))));
+    };
+    let frame = 0;
+    const scheduleUpdate = () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleUpdate);
+    if (readingContentRef.current) observer?.observe(readingContentRef.current);
+    scheduleUpdate();
+    return () => {
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      observer?.disconnect();
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [chapter?.id, active?.id, selectedLessonId]);
   if (!result) return <Redirect to="/assessment" />;
   if (!chapter) return <NotFound />;
-  const active = chapter.lessons.find(l => l.id === selectedLessonId) ?? chapter.lessons[0];
   const path = result.path;
   const allLessons = orderedChapters.flatMap(c => c.lessons);
   const activeIndex = allLessons.findIndex(l => l.id === active?.id);
@@ -419,12 +409,22 @@ function ChapterPage({ params }: { params: { n?: string } }) {
   };
   const previous = allLessons[activeIndex - 1];
   const nextLesson = allLessons[activeIndex + 1];
-  return <div className="page-wrap py-8 sm:py-11">
+  return <>
+    <div className="lesson-reading-progress" role="progressbar" aria-label="تقدم القراءة" aria-valuemin={0} aria-valuemax={100} aria-valuenow={readingProgress} aria-valuetext={`${readingProgress}%`}><span style={{ width: `${readingProgress}%` }} /></div>
+    <div className="page-wrap py-8 sm:py-11">
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Link href="/chapters" className="hover:text-primary" data-testid="link-lesson-breadcrumb">الفصول</Link><ChevronLeft size={15} /><span className="font-semibold text-foreground">الفصل {chapter.order}</span></div><Link href={`/path/${path}`} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold" data-testid="link-back-to-path"><Compass size={16} />{pathInfo[path].title}</Link></div>
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
       <article className="soft-card min-w-0 rounded-[28px] p-5 sm:p-9">
-        <div className="border-b border-border pb-6"><p className="text-sm font-bold text-secondary">الفصل {chapter.order} · من المقرر الأصلي {chapter.id}</p><h1 className="mt-2 text-2xl font-extrabold leading-10 sm:text-3xl" data-testid="text-chapter-title">{chapter.title}</h1>{active && <p className="mt-2 text-sm text-muted-foreground" data-testid="text-lesson-title">{active.title}</p>}</div>
-        {locked ? <div className="my-7 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-6 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-blue-500/10 text-blue-600"><Layers3 /></span><h2 className="mt-4 text-lg font-bold">هذا الدرس ينتظر خطوتك السابقة</h2><p className="mt-2 text-sm leading-7 text-muted-foreground">في المسار المنظّم، نفتح الدروس بالتتابع حتى يبقى البناء واضحًا.</p><Link href={`/chapter/${Math.floor(activeIndex === 0 ? 0 : orderedChapters.find(c => c.lessons.some(l => l.id === allLessons[activeIndex - 1]?.id))?.order ?? 1)}?lesson=${encodeURIComponent(allLessons[activeIndex - 1]?.id ?? '')}`} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground" data-testid="link-previous-required">اذهب إلى الدرس السابق<ArrowLeft size={16} /></Link></div> : active ? <MarkdownView content={active.markdown} /> : <EmptyState title="لا توجد دروس في هذا الفصل بعد" detail="سيظهر محتوى الفصل عند توفره." />}
+        <div className="border-b border-border pb-6"><p className="text-sm font-bold text-secondary">الفصل {chapter.order} · من المقرر الأصلي {chapter.id}</p><h1 className="mt-2 text-2xl font-extrabold leading-10 sm:text-3xl" data-testid="text-chapter-title">{chapter.title}</h1>{active && <><p className="mt-2 text-sm text-muted-foreground" data-testid="text-lesson-title">{active.title}</p><p className="mt-2 text-xs text-muted-foreground" data-testid="text-reading-time">زمن القراءة التقريبي: {estimateReadingMinutes(active.markdown)} دقائق</p></>}</div>
+        <div className="lesson-reading-toolbar" role="group" aria-label="أدوات القراءة">
+          <span>حجم الخط</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setFontSize(size => Math.max(16, size - 1))} disabled={fontSize <= 16} className="lesson-font-button" aria-label="تصغير الخط" data-testid="button-font-smaller">A−</button>
+            <span className="min-w-12 text-center text-xs tabular-nums text-muted-foreground" aria-live="polite">{fontSize}px</span>
+            <button type="button" onClick={() => setFontSize(size => Math.min(22, size + 1))} disabled={fontSize >= 22} className="lesson-font-button" aria-label="تكبير الخط" data-testid="button-font-larger">A+</button>
+          </div>
+        </div>
+        {locked ? <div className="my-7 rounded-2xl border border-blue-400/25 bg-blue-500/5 p-6 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-blue-500/10 text-blue-600"><Layers3 /></span><h2 className="mt-4 text-lg font-bold">هذا الدرس ينتظر خطوتك السابقة</h2><p className="mt-2 text-sm leading-7 text-muted-foreground">في المسار المنظّم، نفتح الدروس بالتتابع حتى يبقى البناء واضحًا.</p><Link href={`/chapter/${Math.floor(activeIndex === 0 ? 0 : orderedChapters.find(c => c.lessons.some(l => l.id === allLessons[activeIndex - 1]?.id))?.order ?? 1)}?lesson=${encodeURIComponent(allLessons[activeIndex - 1]?.id ?? '')}`} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground" data-testid="link-previous-required">اذهب إلى الدرس السابق<ArrowLeft size={16} /></Link></div> : active ? <div ref={readingContentRef} data-testid="reading-content"><LessonMarkdown content={active.markdown} fontSize={fontSize} /></div> : <EmptyState title="لا توجد دروس في هذا الفصل بعد" detail="سيظهر محتوى الفصل عند توفره." />}
         {!locked && active && <PathLearningSupport key={active.id} path={path} lessonTitle={active.title} />}
         {!locked && active && <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5"><button onClick={markComplete} disabled={complete} className={`inline-flex min-h-12 items-center gap-2 rounded-xl px-5 font-bold transition disabled:cursor-default ${complete ? 'border border-secondary/30 bg-secondary/10 text-secondary' : 'bg-secondary text-white hover:opacity-90'}`} data-testid="button-toggle-complete">{complete ? <><CheckCircle2 size={18} />أكملت هذا الدرس</> : <><Check size={18} />أنهيت الدرس</>}</button><div className="flex gap-2"><LessonNavLink lesson={previous} direction="previous" />{nextLesson && <LessonNavLink lesson={nextLesson} direction="next" />}</div></div>}
       </article>
@@ -437,7 +437,8 @@ function ChapterPage({ params }: { params: { n?: string } }) {
         <div className="mt-5 border-t border-border pt-4"><Link href="/progress" className="flex items-center justify-between rounded-xl bg-muted/60 p-3 text-sm font-semibold" data-testid="link-lesson-progress"><span>تقدّمك في المقرر</span><ChevronLeft size={16} /></Link></div>
       </aside>
     </div>
-  </div>;
+    </div>
+  </>;
 }
 
 const designThinkingStages = [
