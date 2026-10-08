@@ -335,6 +335,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .soft-card { background: hsl(var(--card)); border: 1px solid hsl(var(--card-border)); box-shadow: 0 14px 40px rgba(36,41,67,.045); }
 .nav-link { transition: color .2s ease, background .2s ease, transform .2s ease; }
 .nav-link:hover { transform: translateY(-1px); }
+.path-animation { display: block; flex: none; overflow: visible; }
+.path-animation-track { fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; opacity: .38; }
+.path-animation-structured-dot { fill: currentColor; opacity: .35; transform-box: fill-box; transform-origin: center; animation: path-step-pulse 1.8s ease-in-out infinite; }
+@keyframes path-step-pulse { 0%,100% { opacity: .35; transform: scale(.76); } 38%,62% { opacity: 1; transform: scale(1.22); } }
+.path-guided-traveler { transform-box: view-box; transform-origin: 0 0; transform: translate(40px, 12px); animation: path-guide-travel 7s ease-in-out infinite; }
+@keyframes path-guide-travel { 0% { transform: translate(8px,32px); } 25% { transform: translate(22px,17px); } 50% { transform: translate(40px,12px); } 75% { transform: translate(58px,17px); } 100% { transform: translate(72px,32px); } }
+.path-animation-open-center { fill: currentColor; opacity: .9; }
+.path-animation-open-node { fill: currentColor; opacity: .55; animation: path-open-drift 3.6s ease-in-out infinite alternate; }
+@keyframes path-open-drift { from { opacity: .5; transform: translate(0,0); } to { opacity: 1; transform: translate(2px,-2px); } }
 .reveal { animation: rise .55s both; }
 .reveal-delay { animation: rise .6s .12s both; }
 @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -352,6 +361,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .markdown-content th,.markdown-content td { border: 1px solid hsl(var(--border)); padding: .65rem; text-align: start; }
 .markdown-content th { background: hsl(var(--muted)); font-weight: 700; }
 @media (max-width: 640px) { .page-wrap { width: min(100% - 28px, 1160px); } .markdown-content table { display: block; overflow-x: auto; white-space: nowrap; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+  .path-guided-traveler { transform: translate(40px,12px) !important; }
+  .path-animation-structured-dot, .path-animation-open-node { opacity: .85 !important; transform: none !important; }
+}
 
 /**
  * Using the elevate system.

@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
+import { SITE_NAME } from './src/lib/config';
 
 const rawPort = process.env.PORT;
 
@@ -31,6 +32,12 @@ export default defineConfig({
   base: basePath,
   plugins: [
     react(),
+    {
+      name: 'site-name-html-metadata',
+      transformIndexHtml(html) {
+        return html.replaceAll('__SITE_NAME__', SITE_NAME);
+      },
+    },
     tailwindcss(),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== 'production' &&
