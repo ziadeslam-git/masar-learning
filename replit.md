@@ -1,10 +1,12 @@
-# [Project name]
+# مسار | بيئة التعلم الذكية
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+بيئة تعلم عربية تكيفية لطلاب تكنولوجيا التعليم؛ تقيس تحمّل الغموض وتوجّه كل طالب إلى مسار تعلّم مناسب مع حفظ تقدمه محلياً.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/masar-learning run dev` — run the Masar web app
+- `pnpm --filter @workspace/masar-learning run build` — build the static Masar web app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,19 +24,25 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/masar-learning/` — the Arabic RTL React app
+- `attached_assets/تكنولوجيا_التعليم_والتحول_الرقمي_أربعة_فصول_منظف_1791493489673.md` — curriculum source of truth
+- `scripts/build-content.ts` — converts the four source chapters to app curriculum JSON before dev/build
+- `artifacts/masar-learning/src/data/assessment.json` — replaceable demo assessment items
+- `artifacts/masar-learning/src/lib/config.ts` — learning-path score thresholds
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Masar has no account system, database, or required backend; assessment and progress state stay in browser `localStorage`.
+- Keep the assessment replaceable through JSON and derive path selection from the named threshold constants.
+- Preserve the attached curriculum text exactly; content JSON is generated from Markdown rather than edited by hand.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Students complete a 12-item demo assessment, receive one of three adaptive paths, study the same four-chapter curriculum in path-specific ways, and track lesson completion.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- For Masar, do not add login, accounts, database storage, or complex backend services.
 
 ## Gotchas
 

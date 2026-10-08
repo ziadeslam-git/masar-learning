@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "مسار | بيئة التعلم الذكية"
+description = "بيئة تعلم عربية تكيفية لطلاب تكنولوجيا التعليم، توجّه الطالب إلى أحد ثلاثة مسارات بحسب تحمّل الغموض وتتابع تقدمه محلياً."
+version = "1.0.0"
+id = "artifacts/masar-learning"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21287
+
+[services.development]
+run = "pnpm --filter @workspace/masar-learning run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/masar-learning", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/masar-learning/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21287"
+BASE_PATH = "/"
