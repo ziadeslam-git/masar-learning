@@ -70,6 +70,7 @@ const pathInfo = {
   guided: { title: 'المسار الموجّه', subtitle: 'خريطة مرنة مع مساحة للاختيار.', color: 'text-teal-600', bg: 'bg-teal-500/10', accent: '#14B8A6', description: 'نقترح لك بداية مناسبة، ويمكنك استكشاف الدروس الأخرى متى أردت.' },
   open: { title: 'المسار المفتوح', subtitle: 'فضولك هو نقطة البداية.', color: 'text-orange-600', bg: 'bg-orange-500/10', accent: '#F97316', description: 'المحتوى كله متاح لك. ابدأ من السؤال الذي يشغلك واتبع اهتمامك.' },
 };
+const learningPaths: LearningPath[] = ['structured', 'guided', 'open'];
 const labels = ['لا أوافق بشدة', 'لا أوافق', 'محايد', 'أوافق', 'أوافق بشدة'];
 
 function App() {
@@ -119,6 +120,7 @@ function AppShell({ children }: { children: ReactNode }) {
     <footer className="mt-20 border-t border-border/80 py-7">
       <div className="page-wrap flex flex-col items-center justify-between gap-2 text-sm text-muted-foreground sm:flex-row">
         <span className="flex items-center gap-3"><Logo size={36} className="shrink-0" /><span className="max-w-3xl text-center text-sm font-bold leading-6 text-foreground">{SITE_NAME}</span></span>
+        <span>بيئة تجريبية تحفظ تقدّمك على هذا الجهاز فقط.</span>
       </div>
     </footer>
   </div>;
@@ -130,22 +132,59 @@ function NavItem({ href, label, active, testId }: { href: string; label: string;
 
 function HomePage() {
   const result = readStorage<Result | null>(storageKeys.result, null);
+  const [done, setDone] = useState<string[]>(() => readStorage<string[]>(storageKeys.done, []));
+  const completedCount = done.length;
   return <div className="hero-grid overflow-hidden">
     <section className="page-wrap grid min-h-[570px] items-center gap-8 py-12 md:grid-cols-[1.04fr_.96fr] md:py-16">
       <div className="reveal order-2 max-w-[610px] md:order-1">
-        <h1 className="text-[2.55rem] font-extrabold leading-[1.32] tracking-tight sm:text-6xl">فكرة التصميم<br /><span className="text-primary">والإنتاج</span></h1>
-        <p className="mt-5 max-w-[560px] text-base leading-8 text-muted-foreground sm:text-lg" data-testid="text-site-name">{SITE_NAME}</p>
+        <div className="mb-6 max-w-[560px] rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm font-semibold leading-6 text-primary" data-testid="text-site-name">{SITE_NAME}</div>
+        <h1 className="text-[2.55rem] font-extrabold leading-[1.32] tracking-tight sm:text-6xl">التفكير التصميمي،<br /><span className="text-primary">وإنتاج المعرفة</span></h1>
+        <p className="mt-5 max-w-[520px] text-lg leading-8 text-muted-foreground">تقدّم البيئة محتوى المقرر ضمن ثلاثة مسارات تعلّم، وتتيح متابعة التقدم على هذا الجهاز.</p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href={result ? `/path/${result.path}` : '/assessment'} className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-primary px-6 py-3 font-bold text-primary-foreground shadow-[0_10px_22px_rgba(79,70,229,.18)] transition hover:-translate-y-0.5" data-testid="link-start-learning">{result ? 'متابعة التعلّم' : 'بدء التقييم'}<ArrowLeft size={18} /></Link>
+          <Link href={result ? `/path/${result.path}` : '/assessment'} className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-primary px-6 py-3 font-bold text-primary-foreground shadow-[0_10px_22px_rgba(79,70,229,.18)] transition hover:-translate-y-0.5" data-testid="link-start-learning">{result ? 'متابعة المسار' : 'بدء التقييم'}<ArrowLeft size={18} /></Link>
+          <Link href="/chapters" className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-card/80 px-5 py-3 font-semibold text-foreground transition hover:bg-muted" data-testid="link-browse-home">استعراض المقرر<ChevronLeft size={17} /></Link>
         </div>
+        <div className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm text-muted-foreground"><span className="flex items-center gap-2"><CheckCircle2 size={17} className="text-secondary" />محتوى المقرر الجامعي</span><span className="flex items-center gap-2"><Target size={17} className="text-primary" />ثلاثة مسارات للتعلّم</span><span className="flex items-center gap-2"><BookOpen size={17} className="text-orange-500" />حفظ التقدم محليًا</span></div>
       </div>
-      <div className="hero-visual reveal-delay relative order-1 mx-auto flex h-[300px] w-full max-w-[480px] items-end justify-center md:order-2 md:h-[460px]" data-testid="hero-visual">
+      <div className="reveal-delay relative order-1 mx-auto flex h-[300px] w-full max-w-[480px] items-end justify-center md:order-2 md:h-[460px]">
         <div className="absolute inset-x-4 bottom-4 top-8 rounded-[45%_45%_22%_22%] bg-gradient-to-br from-[#d8e9e6] via-[#e3e4f6] to-[#fce4cd] dark:from-[#263c43] dark:via-[#333252] dark:to-[#45382f]" />
         <div className="absolute left-4 top-12 hidden h-20 w-20 rounded-3xl border border-white/50 bg-white/35 backdrop-blur md:block" />
-        <div className="hero-float-icon absolute right-2 top-24 grid h-14 w-14 place-items-center rounded-2xl bg-card shadow-lg md:right-1 md:top-28"><BookOpen className="text-primary" size={24} /></div>
-        <img src={studentPortrait} alt="طالب جامعي يستعد لرحلته التعليمية" className="hero-portrait-interaction relative z-10 h-[295px] w-auto max-w-full object-contain object-bottom drop-shadow-[0_22px_24px_rgba(39,45,68,.18)] md:h-[455px]" data-testid="img-student-portrait" />
+        <div className="absolute right-2 top-24 grid h-14 w-14 place-items-center rounded-2xl bg-card shadow-lg md:right-1 md:top-28"><BookOpen className="text-primary" size={24} /></div>
+        <img src={studentPortrait} alt="طالب جامعي يستعد لرحلته التعليمية" className="relative z-10 h-[295px] w-auto max-w-full object-contain object-bottom drop-shadow-[0_22px_24px_rgba(39,45,68,.18)] md:h-[455px]" data-testid="img-student-portrait" />
         <div className="absolute bottom-8 left-0 z-20 rounded-2xl border border-border/70 bg-card/95 px-4 py-3 shadow-lg backdrop-blur"><span className="block text-xs text-muted-foreground">تعلّم جامعي</span><span className="mt-1 block text-sm font-bold">من الفهم إلى التطبيق</span></div>
       </div>
+    </section>
+    <section className="page-wrap pb-12">
+      <div className="soft-card grid gap-5 rounded-[28px] p-5 sm:grid-cols-3 sm:gap-0 sm:p-7">
+        <Step number="01" title="أجب عن التقييم" description="تساعد الإجابات على تقدير مستوى تحمل الغموض." color="text-primary" />
+        <Step number="02" title="راجع المسار المقترح" description="اختر بين التدرج، والإرشاد، وحرية الاستكشاف." color="text-secondary" />
+        <Step number="03" title="تابع إنجاز الدروس" description="محتوى المقرر مع سجل تقدم محلي." color="text-orange-500" />
+      </div>
+      <section className="mt-8" aria-labelledby="learning-paths-heading">
+        <div className="mb-5 max-w-2xl"><p className="text-sm font-bold text-secondary">أنماط تنظيم التعلّم</p><h2 id="learning-paths-heading" className="mt-1 text-2xl font-extrabold">المسارات التعليمية</h2><p className="mt-2 text-sm leading-7 text-muted-foreground">تُعرض المسارات الثلاثة هنا، ويقترح التقييم نقطة بداية وفق الإجابات.</p></div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {learningPaths.map(path => {
+            const info = pathInfo[path];
+            const isCurrent = result?.path === path;
+            const href = !result ? '/assessment' : isCurrent ? `/path/${path}` : '/assessment?fresh=1';
+            const action = !result ? 'ابدأ التقييم' : isCurrent ? 'عرض تفاصيل المسار' : 'أعد التقييم لاستكشافه';
+            return <article key={path} className="soft-card flex flex-col rounded-[24px] p-5" data-testid={`card-path-${path}`} aria-current={isCurrent ? 'true' : undefined}>
+              <div className="flex items-center justify-between gap-3"><span className={`rounded-full px-3 py-1.5 text-xs font-bold ${info.bg} ${info.color}`}>{isCurrent ? 'المسار الحالي' : 'مسار تعلّم'}</span><PathAnimation path={path} className="h-11 w-20" /></div>
+              <h3 className={`mt-4 text-lg font-extrabold ${info.color}`}>{info.title}</h3>
+              <p className="mt-2 min-h-[72px] text-sm leading-6 text-muted-foreground">{info.description}</p>
+              <Link href={href} className="mt-auto inline-flex items-center gap-2 pt-4 text-sm font-bold text-primary hover:underline" data-testid={`link-card-path-${path}`}>{action}<ArrowLeft size={15} /></Link>
+            </article>;
+          })}
+        </div>
+      </section>
+      <div className="mt-7 flex flex-col justify-between gap-4 rounded-[26px] bg-[#252b49] p-6 text-white sm:flex-row sm:items-center sm:p-8">
+        <div><p className="text-sm text-white/65">{result ? 'مرحبًا بعودتك' : 'دون حساب، ودون ضغط'}</p><h2 className="mt-1 text-xl font-bold">{result ? `مسارك الحالي: ${pathInfo[result.path].title}` : 'تقدّمك يبقى على جهازك'}</h2><p className="mt-2 text-sm text-white/65">{result ? `أكملت ${completedCount} درس${completedCount === 1 ? 'ًا' : 'ًا'} حتى الآن.` : 'إجاباتك وإنجازك لا تغادر متصفحك.'}</p></div>
+        <Link href={result ? '/progress' : '/assessment'} className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#252b49] transition hover:-translate-y-0.5 sm:self-center" data-testid="link-journey-cta">{result ? 'عرض التقدّم' : 'ابدأ التقييم'}<ArrowLeft size={17} /></Link>
+      </div>
+    </section>
+    <section className="page-wrap pb-8">
+      <div className="mb-5 flex items-end justify-between gap-3"><div><p className="text-sm font-bold text-secondary">المقرر الدراسي</p><h2 className="mt-1 text-2xl font-extrabold">فصول المقرر</h2></div><Link href="/chapters" className="text-sm font-bold text-primary" data-testid="link-all-chapters">كل الفصول ←</Link></div>
+      <div className="grid gap-3 sm:grid-cols-2">{orderedChapters.slice(0, 4).map((chapter, i) => <ChapterTeaser key={chapter.id} chapter={chapter} index={i} />)}</div>
     </section>
   </div>;
 }
@@ -191,6 +230,17 @@ function PathAnimation({ path, className = '' }: { path: LearningPath; className
       />)}
     </>}
   </svg>;
+}
+
+function Step({ number, title, description, color }: { number: string; title: string; description: string; color: string }) {
+  return <div className="flex gap-4 sm:px-5 sm:first:ps-0 sm:last:pe-0 sm:not(:last-child):border-e sm:not(:last-child):border-border"><span className={`mt-1 font-mono text-sm font-bold ${color}`}>{number}</span><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p></div></div>;
+}
+function ChapterTeaser({ chapter, index }: { chapter: Chapter; index: number }) {
+  return <Link href={`/chapter/${chapter.order}`} className="soft-card group flex items-center gap-4 rounded-2xl p-4 transition hover:-translate-y-0.5 hover:border-primary/35" data-testid={`card-chapter-${chapter.order}`}>
+    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl font-bold ${['bg-primary/10 text-primary', 'bg-teal-500/10 text-teal-600', 'bg-blue-500/10 text-blue-600', 'bg-orange-500/10 text-orange-600'][index % 4]}`}>{String(chapter.order).padStart(2, '0')}</span>
+    <span className="min-w-0 flex-1"><span className="block truncate font-bold">{chapter.title}</span><span className="mt-1 block text-xs text-muted-foreground">{chapter.lessons.length} دروس · فصل {chapter.id} من المصدر</span></span>
+    <ChevronLeft size={18} className="text-muted-foreground transition group-hover:-translate-x-1 group-hover:text-primary" />
+  </Link>;
 }
 
 function AssessmentPage() {
