@@ -6,6 +6,12 @@ export type AssessmentAttempt = {
   path: LearningPath;
 };
 
+export type SkillsTestAttempt = {
+  date: string;
+  score: number;
+  dimensionScores: Record<string, number>;
+};
+
 export const MAX_STORED_ATTEMPTS = 5;
 
 export function appendAttempt(
@@ -21,4 +27,11 @@ export function getPreviousAttempt(attempts: AssessmentAttempt[]): AssessmentAtt
 
 export function getScoreDifference(currentScore: number, previousScore: number): number {
   return currentScore - previousScore;
+}
+
+export function appendSkillsAttempt(
+  attempts: SkillsTestAttempt[],
+  next: SkillsTestAttempt,
+): SkillsTestAttempt[] {
+  return [...attempts, next].slice(-MAX_STORED_ATTEMPTS);
 }

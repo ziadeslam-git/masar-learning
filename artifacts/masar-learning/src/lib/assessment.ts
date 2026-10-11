@@ -28,8 +28,5 @@ export function calculateAssessmentScore(
     const response = responses[question.id];
     return total + (question.reverse ? 6 - response : response);
   }, 0);
-  const minimumTotal = questions.length;
-  const maximumTotal = questions.length * 5;
-
-  return Math.round(((adjustedTotal - minimumTotal) / (maximumTotal - minimumTotal)) * 100);
+  return adjustedTotal;
 }

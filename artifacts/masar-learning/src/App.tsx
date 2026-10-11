@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -6,14 +6,15 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Logo } from '@/components/Logo';
 import { estimateReadingMinutes, LessonMarkdown } from '@/components/LessonMarkdown';
+import { AmbiguityAssessmentPage } from '@/components/AmbiguityAssessmentPage';
+import { SkillsTestPage } from '@/components/SkillsTestPage';
 import { Route, Switch, Link, useLocation, Router as WouterRouter } from 'wouter';
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, ChevronLeft, CircleHelp, Compass, Layers3, Moon, Sun, Target, TrendingUp } from 'lucide-react';
 import curriculumData from '@/data/curriculum.json';
-import assessmentData from '@/data/assessment.json';
 import studentPortrait from '@assets/hero-student_1791493499089.png';
-import { getLearningPath, OPEN_PATH_THRESHOLD, SITE_NAME, STRUCTURED_PATH_THRESHOLD, type LearningPath } from '@/lib/config';
-import { calculateAssessmentScore, hasCompleteAssessmentResponses, isValidLikertResponse } from '@/lib/assessment';
+import { OPEN_PATH_THRESHOLD, SITE_NAME, STRUCTURED_PATH_THRESHOLD, type LearningPath } from '@/lib/config';
 import { appendAttempt, getPreviousAttempt, getScoreDifference, type AssessmentAttempt } from '@/lib/attempts';
+import { readAssessmentResult, readSkillsTestResult, readStorage, removeStorage, storageKeys, writeStorage, type AssessmentResult as Result } from '@/lib/storage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,24 +29,11 @@ import {
 
 type Lesson = { id: string; title: string; markdown: string };
 type Chapter = { id: number; order: number; title: string; lessons: Lesson[] };
-type Question = { id: string; prompt: string; reverse: boolean };
-type Result = { score: number; path: LearningPath; responses: Record<string, number> };
 const chapters = (curriculumData as { chapters: Chapter[] }).chapters;
-const questions = (assessmentData as { questions: Question[] }).questions;
 const orderedChapters = [...chapters].sort((a, b) => a.order - b.order);
-const storageKeys = { result: 'masar-result', answers: 'masar-assessment-responses', attempts: 'masar-assessment-attempts', done: 'masar-completed-lessons', theme: 'masar-theme' };
 const lessonFontSizeKey = 'masar-lesson-font-size';
 const queryClient = new QueryClient();
 
-function readStorage<T>(key: string, fallback: T): T {
-  try {
-    const value = localStorage.getItem(key);
-    return value ? JSON.parse(value) as T : fallback;
-  } catch { return fallback; }
-}
-function writeStorage(key: string, value: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Storage may be unavailable; app remains usable in memory. */ }
-}
 function readLessonFontSize() {
   try {
     const saved = Number(localStorage.getItem(lessonFontSizeKey));
@@ -71,7 +59,6 @@ const pathInfo = {
   open: { title: 'المسار المفتوح', subtitle: 'فضولك هو نقطة البداية.', color: 'text-orange-600', bg: 'bg-orange-500/10', accent: '#F97316', description: 'المحتوى كله متاح لك. ابدأ من السؤال الذي يشغلك واتبع اهتمامك.' },
 };
 const learningPaths: LearningPath[] = ['structured', 'guided', 'open'];
-const labels = ['لا أوافق بشدة', 'لا أوافق', 'محايد', 'أوافق', 'أوافق بشدة'];
 
 function App() {
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
@@ -81,8 +68,9 @@ function Router() {
   const [location] = useLocation();
   return <ErrorBoundary resetKey={location}><AppShell><Switch>
     <Route path="/" component={HomePage} />
-    <Route path="/assessment" component={AssessmentPage} />
+    <Route path="/assessment" component={AmbiguityAssessmentPage} />
     <Route path="/result" component={ResultPage} />
+    <Route path="/skills-test" component={SkillsTestPage} />
     <Route path="/chapters" component={ChaptersPage} />
     <Route path="/progress" component={ProgressPage} />
     <Route path="/path/:path" component={PathPage} />
@@ -98,7 +86,7 @@ function AppShell({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     writeStorage(storageKeys.theme, theme);
   }, [theme]);
-  const result = readStorage<Result | null>(storageKeys.result, null);
+  const result = readAssessmentResult();
   const activePath = location.startsWith('/path') ? location.split('/')[2] : result?.path;
   return <div className="app-shell" dir="rtl">
     <header className="topbar">
@@ -111,6 +99,7 @@ function AppShell({ children }: { children: ReactNode }) {
           <NavItem href="/" label="الرئيسية" active={location === '/'} testId="nav-home" />
           <NavItem href="/chapters" label="المحتوى" active={location.startsWith('/chapters') || location.startsWith('/chapter')} testId="nav-chapters" />
           <NavItem href="/progress" label="تقدّمي" active={location === '/progress'} testId="nav-progress" />
+          <NavItem href="/skills-test" label="اختبار مهارات التفكير التصميمي" mobileLabel="الاختبار" active={location === '/skills-test'} testId="nav-skills-test" />
           {result && <Link href={`/path/${activePath}`} className="nav-link hidden items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 sm:flex" data-testid="nav-my-path"><Compass size={17} />مساري</Link>}
           <button aria-label={theme === 'light' ? 'تفعيل الوضع الداكن' : 'تفعيل الوضع الفاتح'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="nav-link ms-1 grid h-10 w-10 place-items-center rounded-xl border border-border bg-card text-foreground hover:bg-muted" data-testid="button-theme">{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
         </nav>
@@ -126,12 +115,12 @@ function AppShell({ children }: { children: ReactNode }) {
   </div>;
 }
 
-function NavItem({ href, label, active, testId }: { href: string; label: string; active: boolean; testId: string }) {
-  return <Link href={href} className={`nav-link rounded-xl px-2.5 py-2 text-xs font-semibold sm:px-3 sm:text-sm ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} data-testid={testId}>{label}</Link>;
+function NavItem({ href, label, mobileLabel, active, testId }: { href: string; label: string; mobileLabel?: string; active: boolean; testId: string }) {
+  return <Link href={href} className={`nav-link rounded-xl px-2.5 py-2 text-xs font-semibold sm:px-3 sm:text-sm ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} data-testid={testId}>{mobileLabel ? <><span className="sm:hidden">{mobileLabel}</span><span className="hidden sm:inline">{label}</span></> : label}</Link>;
 }
 
 function HomePage() {
-  const result = readStorage<Result | null>(storageKeys.result, null);
+  const result = readAssessmentResult();
   const [done, setDone] = useState<string[]>(() => readStorage<string[]>(storageKeys.done, []));
   const completedCount = done.length;
   return <div className="hero-grid overflow-hidden">
@@ -243,59 +232,8 @@ function ChapterTeaser({ chapter, index }: { chapter: Chapter; index: number }) 
   </Link>;
 }
 
-function AssessmentPage() {
-  const [, setLocation] = useLocation();
-  const freshStart = new URLSearchParams(window.location.search).get('fresh') === '1';
-  const [answers, setAnswers] = useState<Record<string, number>>(() => freshStart ? {} : readStorage(storageKeys.answers, {}));
-  const [index, setIndex] = useState(() => {
-    if (freshStart) return 0;
-    const saved = readStorage<Record<string, number>>(storageKeys.answers, {});
-    const first = questions.findIndex(q => !isValidLikertResponse(saved[q.id]));
-    return first < 0 ? 0 : first;
-  });
-  useEffect(() => {
-    if (!freshStart) return;
-    try { localStorage.removeItem(storageKeys.answers); } catch { /* Empty in-memory answers still start this attempt fresh. */ }
-    setLocation('/assessment');
-  }, [freshStart, setLocation]);
-  const question = questions[index];
-  const answeredCount = questions.filter(q => isValidLikertResponse(answers[q.id])).length;
-  if (!question) return <div className="page-wrap py-12"><EmptyState title="التقييم غير متاح" detail="تعذّر العثور على السؤال الحالي. أعد تحميل الصفحة أو ابدأ التقييم من جديد." action={<Link href="/assessment" className="mt-4 inline-flex rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground" data-testid="link-restart-assessment">إعادة المحاولة</Link>} /></div>;
-  const setAnswer = (value: number) => {
-    if (!question) return;
-    const next = { ...answers, [question.id]: value };
-    setAnswers(next); writeStorage(storageKeys.answers, next);
-  };
-  const finish = () => {
-    if (!hasCompleteAssessmentResponses(questions, answers)) return;
-    const score = calculateAssessmentScore(questions, answers);
-    const result: Result = { score, path: getLearningPath(score), responses: answers };
-    const attempt: AssessmentAttempt = { date: new Date().toISOString(), score, path: result.path };
-    writeStorage(storageKeys.attempts, appendAttempt(readAttempts(), attempt));
-    writeStorage(storageKeys.result, result);
-    setLocation('/result');
-  };
-  if (!questions.length) return <div className="page-wrap py-16"><div className="soft-card rounded-3xl p-8 text-center"><h1 className="text-2xl font-bold">التقييم قيد الإعداد</h1><p className="mt-3 text-muted-foreground">ستظهر الأسئلة هنا عند تجهيز المحتوى.</p></div></div>;
-  return <div className="page-wrap max-w-3xl py-10 sm:py-16">
-    <Link href="/" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary" data-testid="link-assessment-home"><ArrowRight size={17} />العودة للرئيسية</Link>
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-bold text-primary">اكتشف ما يناسبك</p><h1 className="mt-2 text-3xl font-extrabold">كيف تحب أن تتعلّم؟</h1></div><span className="rounded-full bg-muted px-4 py-2 text-sm font-bold" data-testid="text-assessment-count">{index + 1} من {questions.length}</span></div>
-     <div className="mb-6 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${(answeredCount / questions.length) * 100}%` }} /></div>
-    <div className="soft-card rounded-[28px] p-5 sm:p-9" key={question.id}>
-      <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><CircleHelp size={20} /></span><div><span className="inline-flex rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-600">سؤال تجريبي للتوضيح</span><h2 className="mt-4 min-h-[90px] text-xl font-bold leading-9 sm:text-2xl" data-testid={`text-question-${question.id}`}>{question.prompt}</h2></div></div>
-      <div className="mt-7 grid gap-2.5" role="radiogroup" aria-label="اختر درجة موافقتك">
-        {labels.map((label, i) => <button key={label} type="button" role="radio" aria-checked={answers[question.id] === i + 1} onClick={() => setAnswer(i + 1)} className={`flex min-h-14 items-center justify-between rounded-2xl border px-4 text-start transition ${answers[question.id] === i + 1 ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/40 hover:bg-muted/40'}`} data-testid={`answer-${question.id}-${i + 1}`}><span className="font-semibold">{label}</span><span className={`grid h-5 w-5 place-items-center rounded-full border ${answers[question.id] === i + 1 ? 'border-primary bg-primary text-white' : 'border-muted-foreground/40'}`}>{answers[question.id] === i + 1 && <Check size={13} />}</span></button>)}
-      </div>
-      <p className="mt-5 text-center text-xs leading-6 text-muted-foreground">لا توجد إجابة صحيحة أو خاطئة. هذه عبارات تجريبية فقط لمعاينة تجربة التقييم.</p>
-    </div>
-    <div className="mt-5 flex items-center justify-between gap-3">
-      <button type="button" onClick={() => setIndex(Math.max(0, index - 1))} disabled={index === 0} className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-border px-5 font-bold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40" data-testid="button-assessment-previous"><ArrowRight size={17} />السابق</button>
-       {index < questions.length - 1 ? <button type="button" onClick={() => setIndex(index + 1)} disabled={!isValidLikertResponse(answers[question.id])} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-6 font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" data-testid="button-assessment-next">التالي<ArrowLeft size={17} /></button> : <button type="button" onClick={finish} disabled={!hasCompleteAssessmentResponses(questions, answers)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-primary px-6 font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" data-testid="button-assessment-finish">اعرض نتيجتي<Target size={17} /></button>}
-    </div>
-  </div>;
-}
-
 function ResultPage() {
-  const result = readStorage<Result | null>(storageKeys.result, null);
+  const result = readAssessmentResult();
   const [, setLocation] = useLocation();
   if (!result) return <Redirect to="/assessment" />;
   const info = pathInfo[result.path];
@@ -312,7 +250,8 @@ function ResultPage() {
     ? new Date(previousAttempt.date).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
     : null;
   const beginRetake = () => {
-    try { localStorage.removeItem(storageKeys.answers); } catch { /* The fresh route still begins with empty in-memory answers. */ }
+    removeStorage(storageKeys.answers);
+    removeStorage(storageKeys.ambiguityStartedAt);
     setLocation('/assessment?fresh=1');
   };
   return <div className="page-wrap max-w-4xl py-12 sm:py-16">
@@ -330,8 +269,9 @@ function ResultPage() {
         </aside> : <div className="mx-auto grid h-44 w-44 place-items-center rounded-full" style={{ background: `${info.accent}14` }}><div className="grid h-32 w-32 place-items-center rounded-full border-2" style={{ borderColor: `${info.accent}55` }}><div className="text-center"><Compass className="mx-auto" size={30} style={{ color: info.accent }} /><span className="mt-2 block text-sm font-bold">طريقك يبدأ هنا</span></div></div></div>}
       </div>
     </div>
-    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+    <div className="mt-6 grid gap-4 sm:grid-cols-3">
       <button onClick={() => setLocation(`/path/${result.path}`)} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground transition hover:-translate-y-0.5" data-testid="button-view-path">ابدأ {info.title}<ArrowLeft size={18} /></button>
+      <Link href="/skills-test" className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/5 px-4 text-center font-bold text-primary transition hover:-translate-y-0.5 hover:bg-primary/10" data-testid="link-skills-test-from-result">اختبار مهارات التفكير التصميمي<Target size={17} /></Link>
       <button type="button" onClick={beginRetake} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-border bg-card font-bold transition hover:bg-muted" data-testid="link-retake-assessment">أعد التقييم من جديد<TrendingUp size={17} /></button>
     </div>
     <p className="mt-6 text-center text-xs leading-6 text-muted-foreground">هذا التقييم التجريبي أداة للتأمل في تفضيلاتك وليس تشخيصًا أو حكمًا على قدراتك. يمكنك تغيير المسار في أي وقت.</p>
@@ -342,7 +282,7 @@ function Redirect({ to }: { to: string }) { const [, setLocation] = useLocation(
 function Skeleton() { return <div className="animate-pulse space-y-4"><div className="h-8 w-1/3 rounded-xl bg-muted" /><div className="h-48 rounded-3xl bg-muted" /><div className="h-8 w-2/3 rounded-xl bg-muted" /></div>; }
 
 function PathPage({ params }: { params: { path?: string } }) {
-  const result = readStorage<Result | null>(storageKeys.result, null);
+  const result = readAssessmentResult();
   if (!result) return <Redirect to="/assessment" />;
   const path = params.path as Result['path'];
   const info = pathInfo[path];
@@ -376,7 +316,7 @@ function PathPage({ params }: { params: { path?: string } }) {
 }
 
 function ChaptersPage() {
-  const result = readStorage<Result | null>(storageKeys.result, null);
+  const result = readAssessmentResult();
   const done = readStorage<string[]>(storageKeys.done, []);
   return <div className="page-wrap py-10 sm:py-14">
     <div className="max-w-2xl"><p className="text-sm font-bold text-secondary">مكتبة المقرر</p><h1 className="mt-2 text-3xl font-extrabold sm:text-4xl">محتوى تكنولوجيا التعليم</h1><p className="mt-3 leading-7 text-muted-foreground">أربعة فصول من المعرفة، مرتّبة لتتصفّحها بطريقتك. {result ? 'يمكنك متابعة مسارك أو استكشاف الفصول.' : 'ابدأ التقييم أولًا لفتح الدروس.'}</p></div>
@@ -394,7 +334,7 @@ function ChaptersPage() {
 }
 
 function ChapterPage({ params }: { params: { n?: string } }) {
-  const result = readStorage<Result | null>(storageKeys.result, null);
+  const result = readAssessmentResult();
   const [location, setLocation] = useLocation();
   const chapterIndex = Number(params.n) - 1;
   const chapter = orderedChapters[chapterIndex];
@@ -571,14 +511,27 @@ function InlineMarkdown({ text }: { text: string }) {
 function ProgressPage() {
   const [, setLocation] = useLocation();
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
-  const result = readStorage<Result | null>(storageKeys.result, null);
+  const result = readAssessmentResult();
+  const skillsResult = readSkillsTestResult();
   const done = readStorage<string[]>(storageKeys.done, []);
   const lessons = orderedChapters.flatMap(c => c.lessons);
   const completedLessons = lessons.filter(l => done.includes(l.id));
   const percentage = lessons.length ? Math.round(completedLessons.length / lessons.length * 100) : 0;
   const reset = () => {
-    for (const key of [storageKeys.result, storageKeys.answers, storageKeys.attempts, storageKeys.done]) {
-      try { localStorage.removeItem(key); } catch { /* Continue clearing the other saved progress items. */ }
+    for (const key of [
+      storageKeys.result,
+      storageKeys.answers,
+      storageKeys.attempts,
+      storageKeys.ambiguityStartedAt,
+      storageKeys.skillsResult,
+      storageKeys.skillsAnswers,
+      storageKeys.skillsStartedAt,
+      storageKeys.skillsAttempts,
+      storageKeys.done,
+      'masar-assessment-responses',
+      'masar-assessment-attempts',
+    ]) {
+      removeStorage(key);
     }
     setLocation('/');
   };
@@ -590,6 +543,10 @@ function ProgressPage() {
         <div className="soft-card rounded-[26px] p-6 sm:p-8"><div className="flex items-center justify-between gap-4"><div><p className="text-sm text-muted-foreground">إنجاز المقرر</p><h2 className="mt-1 text-3xl font-extrabold" data-testid="text-progress-percent">{percentage}%</h2></div><div className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary/10 text-secondary"><TrendingUp /></div></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-secondary transition-all duration-500" style={{ width: `${percentage}%` }} /></div><p className="mt-3 text-sm text-muted-foreground">{completedLessons.length} من {lessons.length} درس مكتمل</p></div>
         <div className="soft-card rounded-[26px] p-6"><p className="text-sm text-muted-foreground">مسارك الحالي</p><h2 className={`mt-2 text-xl font-extrabold ${pathInfo[result.path].color}`} data-testid="text-progress-path">{pathInfo[result.path].title}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{pathInfo[result.path].subtitle}</p><Link href={`/path/${result.path}`} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary" data-testid="link-progress-path">عرض تفاصيل المسار<ChevronLeft size={16} /></Link></div>
       </div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-5" data-testid="card-progress-skills-test">
+        <div><p className="text-sm font-bold text-primary">اختبار مهارات التفكير التصميمي</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{skillsResult ? `نتيجتك الأخيرة: ${skillsResult.score} من 25` : 'اختبار مستقل من 25 سؤالًا، مدته 30 دقيقة.'}</p></div>
+        <Link href="/skills-test" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:opacity-90" data-testid="link-progress-skills-test">{skillsResult ? 'عرض النتيجة أو إعادة الاختبار' : 'ابدأ الاختبار'}<ArrowLeft size={16} /></Link>
+      </div>
       <div className="mt-7 flex items-center justify-between gap-3"><h2 className="text-xl font-extrabold">إنجازات الفصول</h2><Link href="/chapters" className="text-sm font-bold text-primary" data-testid="link-progress-chapters">تصفّح المحتوى</Link></div>
       <div className="mt-4 space-y-3">{orderedChapters.map(c => {
         const count = c.lessons.filter(l => done.includes(l.id)).length;
@@ -598,7 +555,7 @@ function ProgressPage() {
       <div className="mt-7 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border p-4"><p className="text-sm text-muted-foreground">إجاباتك وإنجازك محفوظان في متصفح هذا الجهاز فقط.</p><AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <AlertDialogTrigger asChild><button type="button" className="rounded-xl px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10" data-testid="button-reset-progress">مسح التقدّم والبدء من جديد</button></AlertDialogTrigger>
         <AlertDialogContent dir="rtl">
-          <AlertDialogHeader><AlertDialogTitle>هل تريد مسح التقدّم؟</AlertDialogTitle><AlertDialogDescription>سيُحذف التقييم الحالي وسجل المحاولات وإنجاز الدروس من هذا الجهاز. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>هل تريد مسح التقدّم؟</AlertDialogTitle><AlertDialogDescription>سيُحذف التقييم واختبار المهارات وسجلا المحاولات وإنجاز الدروس من هذا الجهاز. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={reset} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">مسح التقدّم</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog></div>

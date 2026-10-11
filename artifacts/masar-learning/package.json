@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "content": "node ../../scripts/build-content.ts",
+    "content": "node ../../scripts/build-content.ts && node ../../scripts/build-assessments.ts",
     "dev": "pnpm run content && vite --config vite.config.ts --host 0.0.0.0",
     "build": "pnpm run content && PORT=5000 BASE_PATH=/ vite build --config vite.config.ts",
     "test:assessment": "node --test ../../scripts/test-assessment.mjs",
