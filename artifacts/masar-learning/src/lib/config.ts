@@ -1,6 +1,9 @@
 export const SITE_NAME =
   'بيئة تعلم قائمة على تطبيقات الذكاء الاصطناعي لتنمية التفكير التصميمي ومهارات إنتاج المعرفة لدى مختلفي مستوى تحمل الغموض';
 
+export const DEVELOPER_NAME = 'زياد الخولي';
+export const DEVELOPER_CONTACT_URL = 'https://wa.me/201040603279';
+
 export const LOW_MAX = 60;
 export const HIGH_MIN = 80;
 export const REVERSE_ITEMS = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20] as const;

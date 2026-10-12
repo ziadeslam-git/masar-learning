@@ -325,12 +325,12 @@
 
 :root { color-scheme: light; --indigo: #4F46E5; --turquoise: #14B8A6; --structured: #3B82F6; --orange: #F97316; }
 .dark { color-scheme: dark; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: clip; }
 button, a { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid hsl(var(--ring)); outline-offset: 3px; }
-.app-shell { min-height: 100dvh; }
+.app-shell { min-height: 100dvh; display: flex; flex-direction: column; overflow-x: clip; }
 .topbar { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(18px); background: hsl(var(--background) / .9); border-bottom: 1px solid hsl(var(--border)); }
-.page-wrap { width: min(1160px, calc(100% - 40px)); margin-inline: auto; }
+.page-wrap { width: min(1160px, calc(100% - 32px)); margin-inline: auto; }
 .hero-grid { background-image: radial-gradient(circle at 8% 15%, rgba(20,184,166,.11), transparent 25%), radial-gradient(circle at 92% 68%, rgba(79,70,229,.11), transparent 27%); }
 .soft-card { background: hsl(var(--card)); border: 1px solid hsl(var(--card-border)); box-shadow: 0 14px 40px rgba(36,41,67,.045); }
 .nav-link { transition: color .2s ease, background .2s ease, transform .2s ease; }
@@ -360,7 +360,25 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .markdown-content table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .95rem; }
 .markdown-content th,.markdown-content td { border: 1px solid hsl(var(--border)); padding: .65rem; text-align: start; }
 .markdown-content th { background: hsl(var(--muted)); font-weight: 700; }
-@media (max-width: 640px) { .page-wrap { width: min(100% - 28px, 1160px); } .markdown-content table { display: block; overflow-x: auto; white-space: nowrap; } }
+.lesson-reading-progress { position: sticky; top: 64px; z-index: 20; height: 3px; width: 100%; background: transparent; }
+@media (min-width: 640px) { .lesson-reading-progress { top: 72px; } }
+.lesson-reading-progress > span { display: block; height: 100%; background: hsl(var(--primary)); transition: width .15s ease-out; }
+.lesson-reading-toolbar { display: flex; align-items: center; justify-content: space-between; padding: .65rem .95rem; margin: 1.25rem 0; border-radius: 1rem; background: hsl(var(--muted) / .5); border: 1px solid hsl(var(--border)); font-size: .875rem; }
+.lesson-font-button { display: inline-flex; align-items: center; justify-content: center; height: 2rem; width: 2rem; border-radius: .5rem; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); font-weight: 700; font-size: .8125rem; transition: background-color .15s, opacity .15s; }
+.lesson-font-button:hover:not(:disabled) { background: hsl(var(--muted)); }
+.lesson-font-button:disabled { opacity: .4; cursor: not-allowed; }
+.lesson-callout { margin: 1.25rem 0; padding: 1rem 1.25rem; border-radius: 1rem; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
+.lesson-callout-heading { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: .875rem; margin-bottom: .5rem; }
+.lesson-callout-example .lesson-callout-heading { color: #f59e0b; }
+.lesson-callout-note .lesson-callout-heading { color: #3b82f6; }
+.lesson-callout-definition .lesson-callout-heading { color: hsl(var(--secondary)); }
+.lesson-callout-body { font-size: .9375rem; line-height: 1.8; color: hsl(var(--muted-foreground)); }
+.lesson-table-wrap { margin: 1.25rem 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.lesson-definition-list { display: grid; gap: .75rem; margin: 1.25rem 0; }
+.lesson-definition-row { display: flex; flex-direction: column; gap: .25rem; padding: .75rem 1rem; border-radius: .75rem; background: hsl(var(--muted) / .4); }
+@media (min-width: 640px) { .lesson-definition-row { flex-direction: row; gap: 1rem; } }
+.lesson-definition-term { font-weight: 700; color: hsl(var(--foreground)); min-width: 140px; }
+@media (max-width: 640px) { .page-wrap { width: min(100% - 24px, 1160px); } .markdown-content table { display: block; overflow-x: auto; white-space: nowrap; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
   .path-guided-traveler { transform: translate(40px,12px) !important; }
