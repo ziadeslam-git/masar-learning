@@ -85,7 +85,7 @@ pnpm --filter @workspace/masar-learning run test:assessment
 ```bash
 pnpm --filter @workspace/masar-learning run build
 ```
-المخرجات ستكون في المجلد: `artifacts/masar-learning/dist/public`
+المخرجات ستكون في المجلد: `artifacts/masar-learning/dist`
 
 ---
 
@@ -97,5 +97,5 @@ pnpm --filter @workspace/masar-learning run build
 - **Framework Preset:** `Vite` (أو `Other`)
 - **Root Directory:** `./` (اتركه فارغاً أو الجذر الرئيسي)
 - **Build Command:** `pnpm --filter @workspace/masar-learning run build`
-- **Output Directory:** `artifacts/masar-learning/dist/public`
+- **Output Directory:** `artifacts/masar-learning/dist`
 - **Install Command:** `pnpm install`

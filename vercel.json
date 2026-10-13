@@ -3,7 +3,7 @@
   "framework": "vite",
   "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @workspace/masar-learning run build",
-  "outputDirectory": "dist",
+  "outputDirectory": "artifacts/masar-learning/dist",
   "rewrites": [
     {
       "source": "/(.*)",
